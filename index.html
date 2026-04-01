@@ -35,37 +35,48 @@
         let localStream;
 
         peer.on('open', id => {
-            document.getElementById('meu-id').innerHTML = `SEU ID: <b style="font-size: 24px; color: #fff;">${id}</b>`;
+            document.getElementById('meu-id').innerHTML = `SEU ID: <b style="font-size: 22px; color: #fff;">${id}</b>`;
         });
 
-        // Função para o CELULAR (Transmissor)
         async function iniciarComoTransmissor() {
             try {
+                // Configuração otimizada para ser leve no seu Acer com AMD
                 localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "environment" },
+                    video: { width: 1280, height: 720, facingMode: "environment" },
                     audio: false
                 });
                 document.getElementById('videoDisplay').srcObject = localStream;
-                alert("Câmera ativa! Agora digite o ID no seu computador.");
+                console.log("Câmera do celular pronta.");
             } catch (err) {
-                alert("Erro ao acessar câmera: " + err);
+                alert("Erro na câmera: " + err);
             }
         }
 
-        // Função para o PC (Receptor)
+        // Função do PC: Agora ela tenta "chamar" o celular com mais insistência
         function conectarComoReceptor() {
-            const idDestino = document.getElementById('id-destino').value;
-            const call = peer.call(idDestino, new MediaStream()); // Liga para o celular
+            const idDestino = document.getElementById('id-destino').value.trim();
+            if(!idDestino) return alert("Cole o ID do celular!");
 
-            alert("Tentando conexão com o celular...");
-
-            peer.on('call', call => {
-                call.answer(); // Atende a chamada do PC
-                call.on('stream', remoteStream => {
-                    document.getElementById('videoDisplay').srcObject = remoteStream;
-                });
+            // O PC liga para o celular enviando um sinal vazio só para abrir o canal
+            const call = peer.call(idDestino, new MediaStream());
+            
+            call.on('stream', remoteStream => {
+                const video = document.getElementById('videoDisplay');
+                video.srcObject = remoteStream;
+                video.play();
             });
+
+            alert("Conexão solicitada! Verifique se a câmera está ativa no celular.");
         }
+
+        // O CELULAR agora "escuta" e entrega o vídeo automaticamente
+        peer.on('call', call => {
+            console.log("Recebendo chamada do PC...");
+            call.answer(localStream); // Entrega o vídeo do celular
+            call.on('stream', remoteStream => {
+                document.getElementById('videoDisplay').srcObject = remoteStream;
+            });
+        });
 
         // Garante que o celular atenda o PC automaticamente
         peer.on('call', call => {
