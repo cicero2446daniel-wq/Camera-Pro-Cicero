@@ -2,66 +2,72 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro v5.0 - Final</title>
+    <title>Câmera Pro v6.0 - Centralizado</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; }
-        video { width: 100%; max-width: 850px; border-radius: 15px; background: #111; margin-top: 5px; }
-        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #333; margin-top: 10px; }
-        button { width: 100%; padding: 18px; margin: 8px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Ajuste do Vídeo para evitar zoom e centralizar */
+        video { width: 100%; max-width: 800px; border-radius: 15px; background: #111; margin: 10px 0; border: 2px solid #333; }
+        
+        /* Painel Centralizado e no Topo */
+        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #c5a059; width: 90%; max-width: 450px; margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        
+        button { width: 100%; padding: 16px; margin: 8px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        button:active { transform: scale(0.98); }
         .btn-selfie { background: #333; color: #fff; border: 1px solid #c5a059; }
-        input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; margin-bottom: 10px; text-align: center; font-size: 18px; }
-        .info { font-size: 14px; color: #888; margin-bottom: 5px; }
+        .btn-conectar { background: #28a745; color: white; margin-top: 15px; }
+        
+        input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; text-align: center; font-size: 16px; margin-top: 10px; }
+        
+        .id-label { font-size: 14px; color: #888; margin-bottom: 5px; }
+        #meu-id { font-size: 18px; color: #fff; font-weight: bold; margin-bottom: 15px; word-break: break-all; background: #222; padding: 10px; border-radius: 8px; }
+        h2 { font-size: 20px; margin: 10px 0; color: #c5a059; }
     </style>
 </head>
 <body>
 
-    <h2 id="status-title">MODO TRANSMISSOR</h2>
-    <video id="videoDisplay" autoplay playsinline muted></video>
-
     <div class="painel">
-        <p class="info">ID DO APARELHO:</p>
-        <div id="meu-id" style="font-size: 20px; color: #fff; font-weight: bold; margin-bottom: 15px;">Carregando...</div>
+        <h2>CONTROLES DA CÂMERA</h2>
+        <p class="id-label">ID DESTE APARELHO:</p>
+        <div id="meu-id">Conectando...</div>
         
-        <div id="controles-camera">
-            <button onclick="iniciarCam('environment')">1. ATIVAR CÂMERA TRASEIRA</button>
-            <button onclick="iniciarCam('user')" class="btn-selfie">1. ATIVAR CÂMERA SELFIE</button>
-        </div>
-
-        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+        <button onclick="iniciarCam('environment')">LIGAR CÂMERA TRASEIRA</button>
+        <button onclick="iniciarCam('user')" class="btn-selfie">LIGAR CÂMERA SELFIE</button>
         
-        <input type="text" id="id-destino" placeholder="Digite o ID do Receptor aqui">
-        <button onclick="conectar()" style="background: #28a745; color: white;">2. ENVIAR SINAL PARA O RECEPTOR</button>
+        <hr style="border:0; border-top: 1px solid #333; margin: 15px 0;">
+        
+        <input type="text" id="id-destino" placeholder="Cole o ID do outro aparelho aqui">
+        <button onclick="conectar()" class="btn-conectar">CHAMAR / RECEBER SINAL</button>
     </div>
+
+    <video id="videoDisplay" autoplay playsinline muted></video>
 
     <script>
         const peer = new Peer();
         let localStream = null;
         const videoElement = document.getElementById('videoDisplay');
-        const isPC = window.innerWidth > 900;
-
-        if (isPC) {
-            document.getElementById('status-title').innerText = "RECEPTOR (PC/OBS)";
-            document.getElementById('controles-camera').style.display = 'none';
-        }
 
         peer.on('open', id => {
             document.getElementById('meu-id').innerText = id;
         });
 
         async function iniciarCam(modo) {
-            if (isPC) return; // Bloqueia ativação da webcam no notebook Acer
-            
+            // Se for PC, avisa que não deve abrir a câmera local
+            if (window.innerWidth > 900) {
+                alert("No PC, você só precisa colar o ID do celular e clicar em CONECTAR.");
+                return;
+            }
+
             if (localStream) localStream.getTracks().forEach(t => t.stop());
 
             try {
-                // Configuração para evitar o zoom (proporção 16:9 forçada)
+                // Configuração para imagem nítida e sem zoom (wide)
                 localStream = await navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: modo,
                         width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        aspectRatio: 1.777777778
+                        height: { ideal: 720 }
                     },
                     audio: false
                 });
@@ -71,12 +77,18 @@
 
         function conectar() {
             const idRemoto = document.getElementById('id-destino').value.trim();
-            if (!idRemoto) return alert("Insira o ID!");
+            if (!idRemoto) return alert("Por favor, insira o ID!");
             
-            // Liga para o receptor enviando o vídeo (ou sinal vazio se for o PC)
-            peer.call(idRemoto, localStream || new MediaStream());
+            // Se tiver câmera aberta (celular), envia o vídeo. Se não (PC), apenas recebe.
+            const call = peer.call(idRemoto, localStream || new MediaStream());
+            
+            call.on('stream', remoteStream => {
+                videoElement.srcObject = remoteStream;
+                videoElement.play();
+            });
         }
 
+        // Atendimento automático (Essencial para o OBS)
         peer.on('call', call => {
             call.answer(localStream);
             call.on('stream', remoteStream => {
