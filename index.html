@@ -1,42 +1,79 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-    <title>Teste Câmera Pro - Baixa Latência</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>Transmissor Câmera Pro v1.0</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; }
-        video { width: 100%; max-width: 800px; border: 2px solid #c5a059; border-radius: 10px; flip-horizontal: true; }
-        .controls { margin: 20px; }
-        button { padding: 15px; background: #c5a059; border: none; border-radius: 5px; font-weight: bold; }
+        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 20px; }
+        video { width: 100%; max-width: 720px; border: 2px solid #c5a059; border-radius: 10px; background: #111; }
+        .painel { background: #161616; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-top: 20px; }
+        button { padding: 15px 30px; background: #c5a059; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: #000; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #c5a059; background: #000; color: #fff; text-align: center; }
     </style>
 </head>
 <body>
-    <h2>Transmissor Câmera Pro</h2>
-    <video id="localVideo" autoplay playsinline muted></video>
-    <div class="controls">
-        <button onclick="iniciarCamera()">LIGAR CÂMERA EM ALTA DEFINIÇÃO</button>
+    <h2><i class="fas fa-video"></i> TRANSMISSOR CÂMERA PRO</h2>
+    <video id="videoDisplay" autoplay playsinline muted></video>
+
+    <div class="painel">
+        <p id="meu-id">Gerando seu ID de conexão...</p>
+        
+        <div id="controles-transmissor">
+            <button onclick="iniciarComoTransmissor()">1. ATIVAR CÂMERA NO CELULAR</button>
+        </div>
+
+        <div id="controles-receptor" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;">
+            <p>NO PC: Digite o ID que aparece no celular abaixo:</p>
+            <input type="text" id="id-destino" placeholder="Digite o ID do celular">
+            <button onclick="conectarComoReceptor()">2. RECEBER SINAL NO PC</button>
+        </div>
     </div>
 
     <script>
-        async function iniciarCamera() {
-            const constraints = {
-                video: {
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    facingMode: "environment" // Usa a câmera traseira
-                },
-                audio: false
-            };
+        const peer = new Peer(); 
+        let localStream;
 
+        peer.on('open', id => {
+            document.getElementById('meu-id').innerHTML = `SEU ID: <b style="font-size: 24px; color: #fff;">${id}</b>`;
+        });
+
+        // Função para o CELULAR (Transmissor)
+        async function iniciarComoTransmissor() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                const videoElement = document.getElementById('localVideo');
-                videoElement.srcObject = stream;
-                console.log("Câmera iniciada com sucesso!");
-            } catch (error) {
-                alert("Erro ao acessar câmera: " + error.message);
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "environment" },
+                    audio: false
+                });
+                document.getElementById('videoDisplay').srcObject = localStream;
+                alert("Câmera ativa! Agora digite o ID no seu computador.");
+            } catch (err) {
+                alert("Erro ao acessar câmera: " + err);
             }
         }
+
+        // Função para o PC (Receptor)
+        function conectarComoReceptor() {
+            const idDestino = document.getElementById('id-destino').value;
+            const call = peer.call(idDestino, new MediaStream()); // Liga para o celular
+
+            alert("Tentando conexão com o celular...");
+
+            peer.on('call', call => {
+                call.answer(); // Atende a chamada do PC
+                call.on('stream', remoteStream => {
+                    document.getElementById('videoDisplay').srcObject = remoteStream;
+                });
+            });
+        }
+
+        // Garante que o celular atenda o PC automaticamente
+        peer.on('call', call => {
+            call.answer(localStream);
+            call.on('stream', remoteStream => {
+                document.getElementById('videoDisplay').srcObject = remoteStream;
+            });
+        });
     </script>
 </body>
 </html>
