@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Câmera Pro - Baixa Latência</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; }
+        video { width: 100%; max-width: 800px; border: 2px solid #c5a059; border-radius: 10px; flip-horizontal: true; }
+        .controls { margin: 20px; }
+        button { padding: 15px; background: #c5a059; border: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>Transmissor Câmera Pro</h2>
+    <video id="localVideo" autoplay playsinline muted></video>
+    <div class="controls">
+        <button onclick="iniciarCamera()">LIGAR CÂMERA EM ALTA DEFINIÇÃO</button>
+    </div>
+
+    <script>
+        async function iniciarCamera() {
+            const constraints = {
+                video: {
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    facingMode: "environment" // Usa a câmera traseira
+                },
+                audio: false
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const videoElement = document.getElementById('localVideo');
+                videoElement.srcObject = stream;
+                console.log("Câmera iniciada com sucesso!");
+            } catch (error) {
+                alert("Erro ao acessar câmera: " + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
