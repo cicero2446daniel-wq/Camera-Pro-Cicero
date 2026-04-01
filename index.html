@@ -2,89 +2,81 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro - Link Direto</title>
+    <title>Câmera Pro v4.0</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; overflow-x: hidden; }
-        video { width: 100%; max-width: 640px; border-radius: 15px; background: #111; margin-top: 10px; }
-        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #333; margin-top: 10px; }
-        button { width: 100%; padding: 16px; margin: 8px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 15px; }
+        video { width: 100%; max-width: 800px; border: 2px solid #c5a059; border-radius: 15px; background: #111; }
+        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #333; margin-top: 15px; }
+        button { padding: 16px; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 15px; }
         .btn-selfie { background: #333; color: #fff; border: 1px solid #c5a059; }
-        input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; margin-bottom: 10px; text-align: center; font-size: 16px; }
-        .id-display { font-size: 14px; color: #888; margin-bottom: 15px; word-break: break-all; }
-        h2 { font-size: 18px; margin-bottom: 5px; }
+        input { padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; width: 100%; box-sizing: border-box; margin-bottom: 15px; text-align: center; }
+        .status { font-size: 13px; color: #888; margin-bottom: 10px; }
     </style>
 </head>
 <body>
+    <h2>TRANSMISSOR CÂMERA PRO</h2>
+    <video id="videoDisplay" autoplay playsinline muted></video>
 
-    <div id="interface-pc" style="display:none;">
-        <h2>RECEPTOR (OBS/PC)</h2>
-        <div class="painel">
-            <p>ID PARA DIGITAR NO CELULAR:</p>
-            <div id="meu-id-pc" style="font-size: 22px; color: #fff; font-weight: bold; padding: 10px; background: #222; border-radius: 10px;">Carregando ID...</div>
-            <p style="font-size: 12px;">(O sinal aparecerá aqui automaticamente)</p>
-        </div>
+    <div class="painel">
+        <div id="meu-id" class="status">Conectando ao sistema...</div>
+        
+        <button onclick="iniciarCam('environment')">1. ATIVAR CÂMERA TRASEIRA (CELULAR)</button>
+        <button onclick="iniciarCam('user')" class="btn-selfie">1. ATIVAR CÂMERA SELFIE (CELULAR)</button>
+        
+        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+        
+        <input type="text" id="id-receptor" placeholder="Cole o ID aqui">
+        <button onclick="conectar()" style="background: #28a745; color: #fff;">2. INICIAR TRANSMISSÃO PARA O PC</button>
     </div>
-
-    <div id="interface-celular" style="display:none;">
-        <h2>TRANSMISSOR (CELULAR)</h2>
-        <video id="preview" autoplay playsinline muted></video>
-        <div class="painel">
-            <button onclick="iniciarCam('environment')">LIGAR CÂMERA TRASEIRA</button>
-            <button onclick="iniciarCam('user')" class="btn-selfie">LIGAR CÂMERA SELFIE</button>
-            <hr style="border:0; border-top: 1px solid #333; margin: 15px 0;">
-            <input type="text" id="id-receptor" placeholder="Cole o ID do OBS aqui">
-            <button onclick="transmitir()" style="background: #28a745; color: white;">CONECTAR AO OBS</button>
-        </div>
-    </div>
-
-    <video id="videoFinal" autoplay playsinline style="display:none;"></video>
 
     <script>
         const peer = new Peer();
         let streamLocal = null;
-        
-        // Separação manual por tamanho de tela
-        if (window.innerWidth > 900) {
-            document.getElementById('interface-pc').style.display = 'block';
-            document.getElementById('videoFinal').style.display = 'block';
-        } else {
-            document.getElementById('interface-celular').style.display = 'block';
-        }
+        const videoElement = document.getElementById('videoDisplay');
 
         peer.on('open', id => {
-            if (document.getElementById('meu-id-pc')) {
-                document.getElementById('meu-id-pc').innerText = id;
-            }
+            document.getElementById('meu-id').innerHTML = `ID DESTE APARELHO: <b style="color:#fff;">${id}</b>`;
         });
 
         async function iniciarCam(modo) {
+            // Se for o PC (detectado pela largura da tela), ignoramos o comando de ligar câmera local
+            if (window.innerWidth > 900) {
+                alert("No computador, use apenas o campo de ID para receber a imagem do celular.");
+                return;
+            }
+
             if (streamLocal) streamLocal.getTracks().forEach(t => t.stop());
+
             try {
+                // Removemos o zoom (lente de aumento) usando configurações padrão de proporção
                 streamLocal = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: modo, width: 1280, height: 720 },
+                    video: { facingMode: modo, width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 });
-                document.getElementById('preview').srcObject = streamLocal;
-            } catch (e) { alert("Erro na câmera: " + e); }
+                videoElement.srcObject = streamLocal;
+            } catch (e) {
+                alert("Erro ao acessar câmera: " + e.message);
+            }
         }
 
-        function transmitir() {
+        function conectar() {
             const idDestino = document.getElementById('id-receptor').value.trim();
-            if (!idDestino || !streamLocal) return alert("Ligue a câmera e cole o ID do OBS!");
+            if (!idDestino) return alert("Insira o ID de destino!");
+
+            // No PC, clicamos aqui para "puxar" a imagem. No celular, para "enviar".
+            const call = peer.call(idDestino, streamLocal || new MediaStream());
             
-            peer.call(idDestino, streamLocal);
-            alert("Transmitindo para o OBS...");
+            call.on('stream', remoteStream => {
+                videoElement.srcObject = remoteStream;
+            });
         }
 
-        // O PC/OBS apenas atende
+        // Atendimento automático: Fundamental para o OBS e PC
         peer.on('call', call => {
-            call.answer();
+            call.answer(streamLocal); 
             call.on('stream', remoteStream => {
-                document.getElementById('interface-pc').style.display = 'none';
-                const v = document.getElementById('videoFinal');
-                v.srcObject = remoteStream;
-                v.play();
+                videoElement.srcObject = remoteStream;
             });
         });
     </script>
