@@ -2,45 +2,52 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro v15.0 - Fluxo Contínuo</title>
+    <title>Câmera Pro v16.0 - Dual Layer</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
-        video { width: 100%; max-width: 720px; border-radius: 15px; background: #111; margin: 10px 0; border: 2px solid #333; min-height: 250px; }
+        .video-container { position: relative; width: 100%; max-width: 720px; height: 405px; background: #111; border-radius: 15px; border: 2px solid #333; overflow: hidden; margin: 10px 0; }
+        
+        /* Camadas de vídeo */
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        #videoLocal { z-index: 2; } /* Sua câmera fica por cima no início */
+        #videoRemoto { z-index: 1; display: none; } /* Celular fica escondido atrás */
+
         .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #c5a059; width: 95%; max-width: 450px; }
-        button { width: 100%; padding: 16px; margin: 5px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; color: #000; }
+        button { width: 100%; padding: 15px; margin: 5px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 14px; color: #000; }
         .btn-selfie { background: #333; color: #fff; border: 1px solid #c5a059; }
-        .btn-stop { background: #dc3545; color: white; } 
-        input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; text-align: center; font-size: 18px; margin-top: 10px; }
-        #meu-id { font-size: 14px; color: #fff; font-weight: bold; background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; }
-        #status-conexao { color: #28a745; font-size: 12px; margin-top: 5px; display: none; }
+        .btn-switch { background: #28a745; color: white; border: 2px solid #fff; }
+        input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; text-align: center; font-size: 16px; }
+        #meu-id { font-size: 14px; color: #fff; font-weight: bold; background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; border: 1px dashed #444; }
     </style>
 </head>
 <body>
 
     <div class="painel">
-        <h2 style="margin:0;">SISTEMA DE LIVE</h2>
+        <h2 style="margin:0 0 10px 0;">CONTROLE DE CAMADAS</h2>
         <div id="meu-id">Conectando...</div>
-        <div id="status-conexao">● TRANSMISSÃO ATIVA</div>
         
         <button onclick="iniciarCam('environment')">LIGAR CÂMERA TRASEIRA</button>
         <button onclick="iniciarCam('user')" class="btn-selfie">LIGAR CÂMERA SELFIE</button>
         
-        <button onclick="alternarParaRemoto()" class="btn-stop">VER APENAS SINAL DO CELULAR</button>
-        
         <hr style="border:0; border-top: 1px solid #333; margin: 15px 0;">
         
         <input type="text" id="id-destino" placeholder="ID do outro aparelho">
-        <button onclick="conectar()" style="background:#28a745; color:white;">RECEBER SINAL</button>
+        <button onclick="conectar()">CONECTAR / PEDIR SINAL</button>
+        
+        <button onclick="mostrarCelular()" class="btn-switch" id="btnTroca" style="display:none;">MOSTRAR IMAGEM DO CELULAR</button>
     </div>
 
-    <video id="videoDisplay" autoplay playsinline muted></video>
+    <div class="video-container">
+        <video id="videoLocal" autoplay playsinline muted></video>
+        <video id="videoRemoto" autoplay playsinline></video>
+    </div>
 
     <script>
         const peer = new Peer();
         let streamLocal = null;
-        let streamRemoto = null;
-        const videoElement = document.getElementById('videoDisplay');
+        const vLocal = document.getElementById('videoLocal');
+        const vRemoto = document.getElementById('videoRemoto');
 
         peer.on('open', id => { document.getElementById('meu-id').innerText = id; });
 
@@ -48,31 +55,12 @@
             if (streamLocal) streamLocal.getTracks().forEach(t => t.stop());
             try {
                 streamLocal = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: modo, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { facingMode: modo, width: 1280, height: 720 },
                     audio: false
                 });
-                // Se já estivermos recebendo algo, não mude o vídeo da tela
-                if (!streamRemoto) videoElement.srcObject = streamLocal;
+                vLocal.srcObject = streamLocal;
+                vLocal.style.display = "block";
             } catch (e) { alert("Erro: " + e.message); }
-        }
-
-        // NOVA LÓGICA: Em vez de matar a track, apenas mudamos o que o <video> exibe
-        function alternarParaRemoto() {
-            if (streamRemoto) {
-                videoElement.srcObject = streamRemoto;
-                videoElement.play();
-                document.getElementById('status-conexao').style.display = 'block';
-                
-                // Se estiver no PC, podemos "mutar" a câmera local para apagar a luz
-                // mas mantemos o objeto vivo para não cair a conexão
-                if (streamLocal) {
-                    streamLocal.getVideoTracks().forEach(track => {
-                        track.enabled = false; // Isso apaga a luz na maioria dos notebooks Acer
-                    });
-                }
-            } else {
-                alert("Aguarde o sinal do celular chegar primeiro!");
-            }
         }
 
         function conectar() {
@@ -82,20 +70,31 @@
             const call = peer.call(idDestino, streamLocal || new MediaStream());
             
             call.on('stream', remoteStream => {
-                streamRemoto = remoteStream;
-                videoElement.srcObject = remoteStream;
-                videoElement.play();
-                document.getElementById('status-conexao').style.display = 'block';
+                vRemoto.srcObject = remoteStream;
+                vRemoto.style.display = "block";
+                document.getElementById('btnTroca').style.display = "block";
+                alert("Sinal do celular recebido! Clique no botão verde para ver.");
             });
+        }
+
+        // Troca visual sem desligar nada
+        function mostrarCelular() {
+            vLocal.style.zIndex = "1";
+            vRemoto.style.zIndex = "2";
+            // Agora que o celular está na frente, "escondemos" a local
+            // para tentar apagar a luz sem matar o processo
+            if (streamLocal) {
+                streamLocal.getVideoTracks()[0].enabled = false;
+            }
+            alert("Exibindo sinal remoto. A luz da webcam do PC deve apagar agora.");
         }
 
         peer.on('call', call => {
             call.answer(streamLocal);
             call.on('stream', remoteStream => {
-                streamRemoto = remoteStream;
-                videoElement.srcObject = remoteStream;
-                videoElement.play();
-                document.getElementById('status-conexao').style.display = 'block';
+                vRemoto.srcObject = remoteStream;
+                vRemoto.style.display = "block";
+                document.getElementById('btnTroca').style.display = "block";
             });
         });
     </script>
