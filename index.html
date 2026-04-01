@@ -2,77 +2,68 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro v3.0 - Modo Transmissão</title>
+    <title>Câmera Pro - OBS Link</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 15px; }
-        video { width: 100%; max-width: 640px; border: 2px solid #c5a059; border-radius: 15px; background: #111; }
-        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #333; margin-top: 15px; }
-        button { padding: 18px; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 12px; font-size: 16px; }
-        .btn-switch { background: #333; color: var(--gold); border: 1px solid #c5a059; }
-        input { padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; width: 100%; box-sizing: border-box; margin-bottom: 15px; text-align: center; font-size: 18px; }
-        .status { font-size: 12px; color: #888; margin-bottom: 10px; }
+        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; overflow: hidden; }
+        video { width: 100vw; height: 100vh; object-fit: cover; background: #000; }
+        .controles { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; background: rgba(22,22,22,0.9); padding: 15px; border-radius: 15px; border: 1px solid #c5a059; }
+        button { width: 100%; padding: 15px; margin: 5px 0; background: #c5a059; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .id-label { font-size: 12px; color: #fff; margin-bottom: 10px; word-break: break-all; }
+        #cam-obs { display: none; color: #c5a059; padding-top: 45vh; }
     </style>
 </head>
 <body>
-    <h2 id="titulo">MODO TRANSMISSOR</h2>
     <video id="videoDisplay" autoplay playsinline muted></video>
+    <div id="cam-obs">AGUARDANDO CONEXÃO DO CELULAR...</div>
 
-    <div class="painel">
-        <div id="meu-id" class="status">Conectando...</div>
-        
-        <div id="controles-celular">
-            <button onclick="iniciarStream('environment')">LIGAR CÂMERA TRASEIRA</button>
-            <button onclick="iniciarStream('user')" class="btn-switch">MUDAR PARA SELFIE</button>
-        </div>
-
-        <div id="controles-pc" style="margin-top: 20px; display:none;">
-            <input type="text" id="id-destino" placeholder="Cole o ID do celular aqui">
-            <button onclick="conectar()">RECEBER IMAGEM DO CELULAR</button>
-        </div>
+    <div id="painel-celular" class="controles">
+        <div id="meu-id" class="id-label">Conectando...</div>
+        <button onclick="iniciar('environment')">LIGAR CÂMERA TRASEIRA</button>
+        <button onclick="iniciar('user')" style="background:#333; color:#fff; border:1px solid #c5a059;">USAR SELFIE</button>
     </div>
 
     <script>
-        const peer = new Peer(); 
+        const peer = new Peer();
         let streamAtiva = null;
+        const videoElement = document.getElementById('videoDisplay');
+
+        // DETECÇÃO AUTOMÁTICA DE OBS
+        const isOBS = navigator.userAgent.includes("OBS") || window.innerWidth > 1000;
+
+        if (isOBS) {
+            document.getElementById('painel-celular').style.display = 'none';
+            document.getElementById('cam-obs').style.display = 'block';
+        }
 
         peer.on('open', id => {
-            document.getElementById('meu-id').innerHTML = `ID DO APARELHO: <b style="color:#fff;">${id}</b>`;
+            document.getElementById('meu-id').innerText = "ID DO CELULAR: " + id;
+            if(isOBS) console.log("ID DO RECEPTOR:", id);
         });
 
-        // Identifica se é PC ou Celular pela largura da tela
-        if(window.innerWidth > 800) {
-            document.getElementById('controles-celular').style.display = 'none';
-            document.getElementById('controles-pc').style.display = 'block';
-            document.getElementById('titulo').innerText = "RECEPTOR (PC)";
-        }
-
-        async function iniciarStream(modo) {
+        async function iniciar(modo) {
             if (streamAtiva) streamAtiva.getTracks().forEach(t => t.stop());
-
-            try {
-                streamAtiva = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: modo, width: 1280, height: 720 },
-                    audio: false
-                });
-                document.getElementById('videoDisplay').srcObject = streamAtiva;
-            } catch (e) { alert("Erro: " + e); }
+            streamAtiva = await navigator.mediaDevices.getUserMedia({ video: { facingMode: modo } });
+            videoElement.srcObject = streamAtiva;
         }
 
-        function conectar() {
-            const idRemoto = document.getElementById('id-destino').value.trim();
-            // O PC liga, mas NÃO envia vídeo nenhum (MediaStream vazio)
-            const call = peer.call(idRemoto, new MediaStream());
-            
+        // RECEPTOR (OBS) - Ele fica ouvindo a chamada
+        peer.on('call', call => {
+            call.answer(); // Atende sem enviar vídeo de volta
             call.on('stream', remoteStream => {
-                document.getElementById('videoDisplay').srcObject = remoteStream;
+                document.getElementById('cam-obs').style.display = 'none';
+                videoElement.srcObject = remoteStream;
+            });
+        });
+
+        // FUNÇÃO DE CONEXÃO (Para usar no Console ou via ID fixo se preferir)
+        function conectarAoID(idRemoto) {
+            const call = peer.call(idRemoto, new MediaStream());
+            call.on('stream', remoteStream => {
+                document.getElementById('cam-obs').style.display = 'none';
+                videoElement.srcObject = remoteStream;
             });
         }
-
-        // O Celular atende e só envia o vídeo dele
-        peer.on('call', call => {
-            call.answer(streamAtiva); 
-        });
     </script>
 </body>
 </html>
