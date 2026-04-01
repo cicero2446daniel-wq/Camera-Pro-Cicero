@@ -2,75 +2,76 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro v2.0 - Multi-Câmera</title>
+    <title>Câmera Pro v3.0 - Modo Transmissão</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #0b0b0b; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 15px; }
-        video { width: 100%; max-width: 600px; border: 2px solid #c5a059; border-radius: 15px; background: #000; }
+        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 15px; }
+        video { width: 100%; max-width: 640px; border: 2px solid #c5a059; border-radius: 15px; background: #111; }
         .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #333; margin-top: 15px; }
-        button { padding: 15px; background: #c5a059; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 14px; }
-        .btn-secundario { background: #333; color: #fff; border: 1px solid #c5a059; }
-        input { padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; width: 100%; box-sizing: border-box; margin-bottom: 15px; text-align: center; }
+        button { padding: 18px; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 12px; font-size: 16px; }
+        .btn-switch { background: #333; color: var(--gold); border: 1px solid #c5a059; }
+        input { padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; width: 100%; box-sizing: border-box; margin-bottom: 15px; text-align: center; font-size: 18px; }
+        .status { font-size: 12px; color: #888; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h2>CÂMERA PRO - ESTÁVEL</h2>
+    <h2 id="titulo">MODO TRANSMISSOR</h2>
     <video id="videoDisplay" autoplay playsinline muted></video>
 
     <div class="painel">
-        <p id="meu-id" style="color:#fff; font-size: 12px;">Conectando ao servidor...</p>
+        <div id="meu-id" class="status">Conectando...</div>
         
-        <button onclick="iniciarCamera('user')">1. USAR CÂMERA FRONTAL (SELFIE)</button>
-        <button onclick="iniciarCamera('environment')" class="btn-secundario">1. USAR CÂMERA TRASEIRA</button>
-        
-        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
-        
-        <input type="text" id="id-destino" placeholder="Cole o ID do celular aqui">
-        <button onclick="conectarAoCelular()">2. RECEBER SINAL NO PC</button>
+        <div id="controles-celular">
+            <button onclick="iniciarStream('environment')">LIGAR CÂMERA TRASEIRA</button>
+            <button onclick="iniciarStream('user')" class="btn-switch">MUDAR PARA SELFIE</button>
+        </div>
+
+        <div id="controles-pc" style="margin-top: 20px; display:none;">
+            <input type="text" id="id-destino" placeholder="Cole o ID do celular aqui">
+            <button onclick="conectar()">RECEBER IMAGEM DO CELULAR</button>
+        </div>
     </div>
 
     <script>
         const peer = new Peer(); 
-        let streamAtual;
+        let streamAtiva = null;
 
         peer.on('open', id => {
-            document.getElementById('meu-id').innerHTML = `ID DO APARELHO:<br><b style="font-size: 18px;">${id}</b>`;
+            document.getElementById('meu-id').innerHTML = `ID DO APARELHO: <b style="color:#fff;">${id}</b>`;
         });
 
-        async function iniciarCamera(modo) {
-            if (streamAtual) streamAtual.getTracks().forEach(track => track.stop()); // Para a câmera anterior
-
-            try {
-                streamAtual = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: modo },
-                    audio: false
-                });
-                document.getElementById('videoDisplay').srcObject = streamAtual;
-            } catch (err) {
-                alert("Erro ao acessar câmera: " + err.message);
-            }
+        // Identifica se é PC ou Celular pela largura da tela
+        if(window.innerWidth > 800) {
+            document.getElementById('controles-celular').style.display = 'none';
+            document.getElementById('controles-pc').style.display = 'block';
+            document.getElementById('titulo').innerText = "RECEPTOR (PC)";
         }
 
-        function conectarAoCelular() {
-            const idRemoto = document.getElementById('id-destino').value.trim();
-            if(!idRemoto) return alert("Insira o ID!");
+        async function iniciarStream(modo) {
+            if (streamAtiva) streamAtiva.getTracks().forEach(t => t.stop());
 
-            // O PC liga para o celular e aguarda o vídeo
+            try {
+                streamAtiva = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: modo, width: 1280, height: 720 },
+                    audio: false
+                });
+                document.getElementById('videoDisplay').srcObject = streamAtiva;
+            } catch (e) { alert("Erro: " + e); }
+        }
+
+        function conectar() {
+            const idRemoto = document.getElementById('id-destino').value.trim();
+            // O PC liga, mas NÃO envia vídeo nenhum (MediaStream vazio)
             const call = peer.call(idRemoto, new MediaStream());
             
             call.on('stream', remoteStream => {
-                const video = document.getElementById('videoDisplay');
-                video.srcObject = remoteStream;
-                video.play();
+                document.getElementById('videoDisplay').srcObject = remoteStream;
             });
         }
 
-        // Atendimento automático no Celular
+        // O Celular atende e só envia o vídeo dele
         peer.on('call', call => {
-            call.answer(streamAtual); // Responde com o sinal da câmera ativa (frontal ou traseira)
-            call.on('stream', remoteStream => {
-                document.getElementById('videoDisplay').srcObject = remoteStream;
-            });
+            call.answer(streamAtiva); 
         });
     </script>
 </body>
