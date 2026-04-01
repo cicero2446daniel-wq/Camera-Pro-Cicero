@@ -55,18 +55,27 @@
         // Função do PC: Agora ela tenta "chamar" o celular com mais insistência
         function conectarComoReceptor() {
             const idDestino = document.getElementById('id-destino').value.trim();
-            if(!idDestino) return alert("Cole o ID do celular!");
+            if(!idDestino) return alert("Digite o ID!");
 
-            // O PC liga para o celular enviando um sinal vazio só para abrir o canal
-            const call = peer.call(idDestino, new MediaStream());
+            console.log("Iniciando chamada para: " + idDestino);
             
+            // Forçamos uma conexão de vídeo mesmo que o PC não tenha câmera
+            const call = peer.call(idDestino, new MediaStream());
+
             call.on('stream', remoteStream => {
+                console.log("Sinal recebido com sucesso!");
                 const video = document.getElementById('videoDisplay');
                 video.srcObject = remoteStream;
-                video.play();
+                video.onloadedmetadata = () => video.play();
             });
 
-            alert("Conexão solicitada! Verifique se a câmera está ativa no celular.");
+            // Se em 5 segundos não conectar, avisamos
+            setTimeout(() => {
+                const video = document.getElementById('videoDisplay');
+                if(!video.srcObject) {
+                    alert("O celular não respondeu. Certifique-se que a imagem aparece NA TELA DO CELULAR antes de tentar o PC.");
+                }
+            }, 5000);
         }
 
         // O CELULAR agora "escuta" e entrega o vídeo automaticamente
