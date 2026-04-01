@@ -2,33 +2,33 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro v7.0 - Final</title>
+    <title>Câmera Pro v8.0 - Livre</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
         video { width: 100%; max-width: 720px; border-radius: 15px; background: #111; margin: 10px 0; border: 2px solid #333; }
-        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #c5a059; width: 95%; max-width: 450px; }
-        button { width: 100%; padding: 16px; margin: 8px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .painel { background: #161616; padding: 20px; border-radius: 20px; border: 1px solid #c5a059; width: 95%; max-width: 450px; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        button { width: 100%; padding: 18px; margin: 8px 0; background: #c5a059; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; color: #000; }
         .btn-selfie { background: #333; color: #fff; border: 1px solid #c5a059; }
-        .btn-acao { background: #28a745; color: white; }
+        .btn-acao { background: #28a745; color: white; margin-top: 15px; }
         input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; text-align: center; font-size: 18px; margin-top: 10px; }
-        #meu-id { font-size: 16px; color: #fff; font-weight: bold; background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; word-break: break-all; }
+        #meu-id { font-size: 16px; color: #fff; font-weight: bold; background: #222; padding: 12px; border-radius: 8px; margin: 10px 0; word-break: break-all; border: 1px dashed #444; }
     </style>
 </head>
 <body>
 
     <div class="painel">
-        <h2 style="margin:0 0 10px 0;">CÂMERA PRO</h2>
-        <div style="font-size: 12px; color: #888;">ID DESTE APARELHO:</div>
-        <div id="meu-id">Conectando...</div>
+        <h2 style="margin:0 0 10px 0;">CONTROLES TOTAIS</h2>
+        <div style="font-size: 12px; color: #888;">ID DESTE DISPOSITIVO:</div>
+        <div id="meu-id">Gerando ID...</div>
         
         <button onclick="iniciarCam('environment')">LIGAR CÂMERA TRASEIRA</button>
         <button onclick="iniciarCam('user')" class="btn-selfie">LIGAR CÂMERA SELFIE</button>
         
-        <hr style="border:0; border-top: 1px solid #333; margin: 15px 0;">
+        <hr style="border:0; border-top: 1px solid #333; margin: 20px 0;">
         
-        <input type="text" id="id-destino" placeholder="Digite o ID do outro aparelho">
-        <button onclick="conectar()" class="btn-acao">CONECTAR / PEDIR SINAL</button>
+        <input type="text" id="id-destino" placeholder="Digite o ID do destino aqui">
+        <button onclick="conectar()" class="btn-acao">CONECTAR / RECEBER SINAL</button>
     </div>
 
     <video id="videoDisplay" autoplay playsinline muted></video>
@@ -38,25 +38,37 @@
         let streamLocal = null;
         const videoElement = document.getElementById('videoDisplay');
 
-        peer.on('open', id => { document.getElementById('meu-id').innerText = id; });
+        peer.on('open', id => { 
+            document.getElementById('meu-id').innerText = id; 
+        });
 
         async function iniciarCam(modo) {
-            // Se estiver no PC e a luz da câmera acender, você saberá que clicou aqui sem querer
-            if (streamLocal) streamLocal.getTracks().forEach(t => t.stop());
+            // Parar câmeras anteriores para trocar de Traseira <-> Selfie sem erro
+            if (streamLocal) {
+                streamLocal.getTracks().forEach(t => t.stop());
+            }
+
             try {
+                // Configuração Wide (sem lente de aumento)
                 streamLocal = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: modo, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { 
+                        facingMode: modo, 
+                        width: { ideal: 1280 }, 
+                        height: { ideal: 720 } 
+                    },
                     audio: false
                 });
                 videoElement.srcObject = streamLocal;
-            } catch (e) { alert("Erro ao abrir câmera: " + e); }
+            } catch (e) { 
+                alert("Erro ao acessar câmera: " + e.message); 
+            }
         }
 
         function conectar() {
             const idDestino = document.getElementById('id-destino').value.trim();
-            if (!idDestino) return alert("Insira o ID!");
+            if (!idDestino) return alert("Insira o ID primeiro!");
             
-            // Se o celular tiver a câmera aberta, ele envia. Se o PC não tiver, ele só pede.
+            // Tenta conectar enviando o stream (se houver) ou apenas chamando
             const call = peer.call(idDestino, streamLocal || new MediaStream());
             
             call.on('stream', remoteStream => {
@@ -64,7 +76,7 @@
             });
         }
 
-        // Atendimento automático (Fundamental para receber o sinal no PC)
+        // Resposta automática para receber sinal
         peer.on('call', call => {
             call.answer(streamLocal);
             call.on('stream', remoteStream => {
