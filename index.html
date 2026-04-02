@@ -2,14 +2,59 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Câmera Pro v21.0 - Automação Total</title>
+    <title>Câmera Pro v20.0 - Full Width</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; }
-        .painel { background: #111; padding: 40px; border-radius: 30px; border: 3px solid #c5a059; width: 95%; max-width: 1400px; margin: 10px auto; }
-        #meu-id { font-size: 50px; color: #fff; font-weight: 900; background: #000; padding: 30px; border-radius: 20px; margin: 20px 0; border: 4px dashed #c5a059; word-break: break-all; font-family: monospace; }
-        input { width: 90%; padding: 30px; border-radius: 20px; border: 4px solid #444; background: #000; color: #28a745; text-align: center; font-size: 40px; font-weight: bold; }
-        button { padding: 25px; background: #c5a059; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 22px; color: #000; text-transform: uppercase; margin: 5px; }
+        
+        /* PAINEL OCUPANDO QUASE A TELA TODA */
+        .painel { 
+            background: #111; 
+            padding: 40px; 
+            border-radius: 30px; 
+            border: 3px solid #c5a059; 
+            width: 95%; /* Ocupa 95% da largura da janela */
+            max-width: 1400px; /* Limite para não distorcer em monitores ultra-wide */
+            margin: 10px auto;
+            box-shadow: 0 0 50px rgba(197, 160, 89, 0.3);
+        }
+        
+        /* NÚMEROS DO ID EM TAMANHO MASSIVO */
+        #meu-id { 
+            font-size: 50px; /* Tamanho de cinema para leitura fácil */
+            color: #fff; 
+            font-weight: 900; 
+            background: #000; 
+            padding: 30px; 
+            border-radius: 20px; 
+            margin: 20px 0; 
+            border: 4px dashed #c5a059;
+            word-break: break-all;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 2px;
+        }
+
+        /* CAMPO DE DIGITAÇÃO TAMBÉM GIGANTE */
+        input { 
+            width: 90%; 
+            padding: 30px; 
+            border-radius: 20px; 
+            border: 4px solid #444; 
+            background: #000; 
+            color: #28a745; 
+            text-align: center; 
+            font-size: 40px; 
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .grid-botoes { display: flex; gap: 20px; margin-top: 20px; }
+        button { flex: 1; padding: 25px; background: #c5a059; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 22px; color: #000; text-transform: uppercase; }
+        .btn-selfie { background: #333; color: #fff; border: 2px solid #c5a059; }
+        .btn-sucesso { background: #28a745; color: white; border: 4px solid #fff; font-size: 30px; padding: 40px; margin-top: 30px; width: 100%; }
+        
+        label { font-size: 20px; color: #888; font-weight: bold; text-transform: uppercase; }
+
         .video-container { position: relative; width: 95%; max-width: 1200px; height: 500px; background: #000; border-radius: 25px; border: 2px solid #333; overflow: hidden; margin: 20px auto; }
         video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
         #videoLocal { z-index: 2; }
@@ -17,12 +62,26 @@
     </style>
 </head>
 <body>
+
     <div class="painel">
-        <h1 id="status-titulo">MODO AUTOMÁTICO</h1>
-        <div id="meu-id">IDENTIFICANDO...</div>
-        <input type="text" id="id-destino" placeholder="Aguardando comando...">
-        <br>
-        <button onclick="conectar()">CONECTAR MANUAL</button>
+        <h1 style="margin:0 0 20px 0; font-size: 40px; letter-spacing: 3px;">PAINEL DE CONEXÃO</h1>
+        
+        <label>SEU CÓDIGO PARA COPIAR:</label>
+        <div id="meu-id">GERANDO...</div>
+        
+        <div class="grid-botoes">
+            <button onclick="iniciarCam('environment')">ATIVAR CÂMERA DO PC</button>
+            <button onclick="iniciarCam('user')" class="btn-selfie">MODO SELFIE</button>
+        </div>
+        
+        <hr style="border:0; border-top: 3px solid #333; margin: 40px 0;">
+        
+        <label>COLE O CÓDIGO DO CELULAR AQUI:</label>
+        <input type="text" id="id-destino" placeholder="000-000-000">
+        
+        <button onclick="conectar()" style="background:#444; color:#fff; font-size: 25px; margin-top: 20px;">1. SINCRONIZAR APARELHOS</button>
+        
+        <button onclick="liberarImagemCelular()" id="btnVerCelular" class="btn-sucesso" style="display:none;">2. MOSTRAR SINAL DO CELULAR</button>
     </div>
 
     <div class="video-container">
@@ -31,49 +90,53 @@
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const modo = urlParams.get('modo'); // 'celular' ou 'pc'
-        const idFixo = urlParams.get('id');  // O ID que você escolher no JSON
-
-        // Se for celular, ele é o ID que o PC vai buscar. Se for PC, ele busca o celular.
-        const meuId = (modo === 'celular') ? idFixo : (idFixo + "-receptor");
-        const destinoId = (modo === 'celular') ? (idFixo + "-receptor") : idFixo;
-
-        const peer = new Peer(meuId);
+        const peer = new Peer();
         let streamLocal = null;
         const vLocal = document.getElementById('videoLocal');
         const vRemoto = document.getElementById('videoRemoto');
+        const btnVer = document.getElementById('btnVerCelular');
 
-        peer.on('open', id => {
-            document.getElementById('meu-id').innerText = id;
-            if (modo === 'celular') {
-                document.getElementById('status-titulo').innerText = "MODO: CELULAR (TRANSMISSOR)";
-                iniciarCam('environment'); // Já liga a câmera traseira no celular
-            } else {
-                document.getElementById('status-titulo').innerText = "MODO: SISTEMA (RECEPTOR)";
-                document.getElementById('id-destino').value = destinoId;
-                // No PC (StreamLite), ele tenta conectar no celular após 5 segundos
-                setTimeout(conectar, 5000);
-            }
-        });
+        peer.on('open', id => { document.getElementById('meu-id').innerText = id; });
 
-        async function iniciarCam(face) {
+        async function iniciarCam(modo) {
+            if (streamLocal) streamLocal.getTracks().forEach(t => t.stop());
             try {
-                streamLocal = await navigator.mediaDevices.getUserMedia({ video: { facingMode: face }, audio: false });
+                streamLocal = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: modo, width: 1280, height: 720 },
+                    audio: false
+                });
                 vLocal.srcObject = streamLocal;
-            } catch (e) { console.error(e); }
+            } catch (e) { alert("Erro: " + e.message); }
         }
 
         function conectar() {
-            const dest = document.getElementById('id-destino').value;
-            const call = peer.call(dest, streamLocal || new MediaStream());
-            call.on('stream', remote => { vRemoto.srcObject = remote; vLocal.style.zIndex = "1"; vRemoto.style.zIndex = "2"; });
+            const idDestino = document.getElementById('id-destino').value.trim();
+            if (!idDestino) return alert("Insira o código!");
+            const call = peer.call(idDestino, streamLocal || new MediaStream());
+            call.on('stream', remoteStream => {
+                vRemoto.srcObject = remoteStream;
+                btnVer.style.display = "block";
+            });
+        }
+
+        function liberarImagemCelular() {
+            vLocal.style.zIndex = "1";
+            vRemoto.style.zIndex = "2";
+            if (streamLocal) {
+                streamLocal.getVideoTracks().forEach(track => { track.enabled = false; });
+            }
         }
 
         peer.on('call', call => {
             call.answer(streamLocal);
-            call.on('stream', remote => { vRemoto.srcObject = remote; vLocal.style.zIndex = "1"; vRemoto.style.zIndex = "2"; });
+            call.on('stream', remoteStream => {
+                vRemoto.srcObject = remoteStream;
+                btnVer.style.display = "block";
+            });
         });
     </script>
 </body>
 </html>
+
+
+
