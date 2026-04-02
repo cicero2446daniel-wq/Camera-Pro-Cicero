@@ -1,142 +1,105 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Câmera Pro v20.0 - Full Width</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <style>
-        body { background: #000; color: #c5a059; text-align: center; font-family: sans-serif; margin: 0; padding: 10px; }
-        
-        /* PAINEL OCUPANDO QUASE A TELA TODA */
-        .painel { 
-            background: #111; 
-            padding: 40px; 
-            border-radius: 30px; 
-            border: 3px solid #c5a059; 
-            width: 95%; /* Ocupa 95% da largura da janela */
-            max-width: 1400px; /* Limite para não distorcer em monitores ultra-wide */
-            margin: 10px auto;
-            box-shadow: 0 0 50px rgba(197, 160, 89, 0.3);
+<script>
+    const peer = new Peer();
+    let streamLocal = null;
+    let callAtiva = null; // Item novo: para controlar a chamada atual
+    
+    const vLocal = document.getElementById('videoLocal');
+    const vRemoto = document.getElementById('videoRemoto');
+    const btnVer = document.getElementById('btnVerCelular');
+    const displayId = document.getElementById('meu-id');
+
+    // 1. GERENCIAMENTO DE ID E STATUS
+    peer.on('open', id => { 
+        displayId.innerText = id; 
+        console.log("Sistema Pronto. Seu ID:", id);
+    });
+
+    peer.on('error', err => {
+        console.error("Erro no PeerJS:", err.type);
+        if(err.type === 'peer-unavailable') alert("Código de destino não encontrado!");
+    });
+
+    // 2. INICIALIZAÇÃO DE CÂMERA COM LIMPEZA DE MEMÓRIA
+    async function iniciarCam(modo) {
+        // Limpa a câmera anterior antes de abrir a nova (Economiza bateria/processamento)
+        if (streamLocal) {
+            streamLocal.getTracks().forEach(t => t.stop());
         }
         
-        /* NÚMEROS DO ID EM TAMANHO MASSIVO */
-        #meu-id { 
-            font-size: 50px; /* Tamanho de cinema para leitura fácil */
-            color: #fff; 
-            font-weight: 900; 
-            background: #000; 
-            padding: 30px; 
-            border-radius: 20px; 
-            margin: 20px 0; 
-            border: 4px dashed #c5a059;
-            word-break: break-all;
-            font-family: 'Courier New', Courier, monospace;
-            letter-spacing: 2px;
-        }
-
-        /* CAMPO DE DIGITAÇÃO TAMBÉM GIGANTE */
-        input { 
-            width: 90%; 
-            padding: 30px; 
-            border-radius: 20px; 
-            border: 4px solid #444; 
-            background: #000; 
-            color: #28a745; 
-            text-align: center; 
-            font-size: 40px; 
-            font-weight: bold;
-            margin-top: 20px;
-        }
-
-        .grid-botoes { display: flex; gap: 20px; margin-top: 20px; }
-        button { flex: 1; padding: 25px; background: #c5a059; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 22px; color: #000; text-transform: uppercase; }
-        .btn-selfie { background: #333; color: #fff; border: 2px solid #c5a059; }
-        .btn-sucesso { background: #28a745; color: white; border: 4px solid #fff; font-size: 30px; padding: 40px; margin-top: 30px; width: 100%; }
-        
-        label { font-size: 20px; color: #888; font-weight: bold; text-transform: uppercase; }
-
-        .video-container { position: relative; width: 95%; max-width: 1200px; height: 500px; background: #000; border-radius: 25px; border: 2px solid #333; overflow: hidden; margin: 20px auto; }
-        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
-        #videoLocal { z-index: 2; }
-        #videoRemoto { z-index: 1; }
-    </style>
-</head>
-<body>
-
-    <div class="painel">
-        <h1 style="margin:0 0 20px 0; font-size: 40px; letter-spacing: 3px;">PAINEL DE CONEXÃO</h1>
-        
-        <label>SEU CÓDIGO PARA COPIAR:</label>
-        <div id="meu-id">GERANDO...</div>
-        
-        <div class="grid-botoes">
-            <button onclick="iniciarCam('environment')">ATIVAR CÂMERA DO PC</button>
-            <button onclick="iniciarCam('user')" class="btn-selfie">MODO SELFIE</button>
-        </div>
-        
-        <hr style="border:0; border-top: 3px solid #333; margin: 40px 0;">
-        
-        <label>COLE O CÓDIGO DO CELULAR AQUI:</label>
-        <input type="text" id="id-destino" placeholder="000-000-000">
-        
-        <button onclick="conectar()" style="background:#444; color:#fff; font-size: 25px; margin-top: 20px;">1. SINCRONIZAR APARELHOS</button>
-        
-        <button onclick="liberarImagemCelular()" id="btnVerCelular" class="btn-sucesso" style="display:none;">2. MOSTRAR SINAL DO CELULAR</button>
-    </div>
-
-    <div class="video-container">
-        <video id="videoLocal" autoplay playsinline muted></video>
-        <video id="videoRemoto" autoplay playsinline></video>
-    </div>
-
-    <script>
-        const peer = new Peer();
-        let streamLocal = null;
-        const vLocal = document.getElementById('videoLocal');
-        const vRemoto = document.getElementById('videoRemoto');
-        const btnVer = document.getElementById('btnVerCelular');
-
-        peer.on('open', id => { document.getElementById('meu-id').innerText = id; });
-
-        async function iniciarCam(modo) {
-            if (streamLocal) streamLocal.getTracks().forEach(t => t.stop());
-            try {
-                streamLocal = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: modo, width: 1280, height: 720 },
-                    audio: false
-                });
-                vLocal.srcObject = streamLocal;
-            } catch (e) { alert("Erro: " + e.message); }
-        }
-
-        function conectar() {
-            const idDestino = document.getElementById('id-destino').value.trim();
-            if (!idDestino) return alert("Insira o código!");
-            const call = peer.call(idDestino, streamLocal || new MediaStream());
-            call.on('stream', remoteStream => {
-                vRemoto.srcObject = remoteStream;
-                btnVer.style.display = "block";
+        try {
+            streamLocal = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: modo, 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: false
             });
-        }
-
-        function liberarImagemCelular() {
-            vLocal.style.zIndex = "1";
-            vRemoto.style.zIndex = "2";
-            if (streamLocal) {
-                streamLocal.getVideoTracks().forEach(track => { track.enabled = false; });
+            vLocal.srcObject = streamLocal;
+            
+            // Se já houver uma chamada ativa, substitui o vídeo enviado
+            if (callAtiva && callAtiva.peerConnection) {
+                const videoTrack = streamLocal.getVideoTracks()[0];
+                const sender = callAtiva.peerConnection.getSenders().find(s => s.track.kind === 'video');
+                if (sender) sender.replaceTrack(videoTrack);
             }
+        } catch (e) { 
+            alert("Não foi possível acessar a câmera: " + e.message); 
         }
+    }
 
-        peer.on('call', call => {
-            call.answer(streamLocal);
-            call.on('stream', remoteStream => {
-                vRemoto.srcObject = remoteStream;
-                btnVer.style.display = "block";
-            });
+    // 3. FUNÇÃO DE CONEXÃO COMPLETA (Sincronizar)
+    function conectar() {
+        const idDestino = document.getElementById('id-destino').value.trim();
+        if (!idDestino) return alert("Por favor, cole o código do celular!");
+
+        // Garante que enviamos algo, mesmo que a câmera local não tenha sido ligada
+        const streamParaEnviar = streamLocal || new MediaStream();
+        
+        callAtiva = peer.call(idDestino, streamParaEnviar);
+        configurarChamada(callAtiva);
+    }
+
+    // 4. RESPOSTA AUTOMÁTICA
+    peer.on('call', call => {
+        callAtiva = call;
+        call.answer(streamLocal || new MediaStream());
+        configurarChamada(call);
+    });
+
+    // 5. CONFIGURAÇÃO DOS EVENTOS DA CHAMADA (O que faltava)
+    function configurarChamada(call) {
+        call.on('stream', remoteStream => {
+            console.log("Sinal do celular recebido com sucesso!");
+            vRemoto.srcObject = remoteStream;
+            btnVer.style.display = "block"; 
+            
+            // Feedback visual no painel
+            document.querySelector('h1').innerText = "CONECTADO";
+            document.querySelector('h1').style.color = "#28a745";
         });
-    </script>
-</body>
-</html>
 
+        call.on('close', () => {
+            alert("A conexão foi encerrada.");
+            btnVer.style.display = "none";
+            document.querySelector('h1').innerText = "PAINEL DE CONEXÃO";
+            document.querySelector('h1').style.color = "#c5a059";
+        });
+    }
 
-
+    // 6. LIBERAR IMAGEM (Ajuste fino de Z-Index)
+    function liberarImagemCelular() {
+        // Traz o vídeo remoto para a frente
+        vLocal.style.zIndex = "1";
+        vRemoto.style.zIndex = "2";
+        
+        // Desativa o vídeo local para economizar banda, mas mantém a conexão
+        if (streamLocal) {
+            streamLocal.getVideoTracks().forEach(track => { track.enabled = false; });
+        }
+        
+        btnVer.innerText = "✔ TRANSMITINDO CELULAR";
+        btnVer.style.background = "#007bff";
+    }
+</script>
